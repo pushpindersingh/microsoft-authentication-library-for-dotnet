@@ -30,7 +30,7 @@ stages:
   jobs:
   - job: 'Build'
     pool:
-        name: Hosted VS2017
+        name: Hosted VS2019
         demands:
         - msbuild
         - visualstudio
@@ -160,7 +160,7 @@ stages:
   - job: 'AppCenterAndroidMsalTests'
     dependsOn: 'Build'
     pool:
-        name: Hosted VS2017
+        name: Hosted VS2019
     steps:
 
     - powershell: '$Import = $(FastRun)'
@@ -206,7 +206,7 @@ stages:
     - 'Build'
     - 'BuildiOSAppCenterApp'
     pool:
-        name: Hosted VS2017
+        name: Hosted VS2019
     steps:
 
     - task: DownloadBuildArtifacts@0
