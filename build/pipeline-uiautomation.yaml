@@ -4,8 +4,6 @@ trigger:
   branches:
     include:
     - master
-    exclude:
-    - markzuber/*
 
 pr:
 - master
@@ -30,7 +28,7 @@ stages:
   jobs:
   - job: 'Build'
     pool:
-        name: 'Hosted Windows 2019 with VS 2019'
+        vmImage: 'windows-latest'
         demands:
         - msbuild
         - visualstudio
