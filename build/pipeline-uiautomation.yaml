@@ -94,7 +94,7 @@ stages:
 
   - job: 'BuildiOSAppCenterApp'
     pool:
-        name: Hosted Mac Internal
+        vmImage: 'macOS-latest'
         demands:
         - Xamarin.iOS
     steps:
@@ -158,7 +158,7 @@ stages:
   - job: 'AppCenterAndroidMsalTests'
     dependsOn: 'Build'
     pool:
-        name: 'Hosted Windows 2019 with VS 2019'
+      vmImage: 'windows-latest'
     steps:
 
     - powershell: '$Import = $(FastRun)'
@@ -204,7 +204,7 @@ stages:
     - 'Build'
     - 'BuildiOSAppCenterApp'
     pool:
-        name: 'Hosted Windows 2019 with VS 2019'
+      vmImage: 'windows-latest'
     steps:
 
     - task: DownloadBuildArtifacts@0
