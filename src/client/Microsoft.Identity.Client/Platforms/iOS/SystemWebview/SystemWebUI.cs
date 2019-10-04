@@ -71,7 +71,10 @@ namespace Microsoft.Identity.Client.Platforms.iOS.SystemWebview
                         asWebAuthenticationSession.PresentationContextProvider = new ASWebAuthenticationPresentationContextProviderWindow();
                     }
 
-                    asWebAuthenticationSession.Start();
+                    asWebAuthenticationSession.BeginInvokeOnMainThread(() =>
+                    {
+                        asWebAuthenticationSession.Start();
+                    });
                 }
 
                 else if (UIDevice.CurrentDevice.CheckSystemVersion(11, 0))
