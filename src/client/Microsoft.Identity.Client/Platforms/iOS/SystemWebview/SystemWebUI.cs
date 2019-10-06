@@ -65,16 +65,17 @@ namespace Microsoft.Identity.Client.Platforms.iOS.SystemWebview
                             }
                         });
 
-                    asWebAuthenticationSession.BeginInvokeOnMainThread(() =>
+                    // iOS 13 requires a PresentationContextProvider
+                    if (UIDevice.CurrentDevice.CheckSystemVersion(13, 0))
                     {
-                        // iOS 13 requires a PresentationContextProvider
-                        if (UIDevice.CurrentDevice.CheckSystemVersion(13, 0))
+                        asWebAuthenticationSession.BeginInvokeOnMainThread(() =>
                         {
                             asWebAuthenticationSession.PresentationContextProvider =
-                                new ASWebAuthenticationPresentationContextProviderWindow();
-                        }
-                        asWebAuthenticationSession.Start();
-                    });
+                            new ASWebAuthenticationPresentationContextProviderWindow();
+                        });
+                    }
+
+                    asWebAuthenticationSession.Start();
                 }
 
                 else if (UIDevice.CurrentDevice.CheckSystemVersion(11, 0))
