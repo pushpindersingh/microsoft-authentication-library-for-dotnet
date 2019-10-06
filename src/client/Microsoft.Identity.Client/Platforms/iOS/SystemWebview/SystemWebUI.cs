@@ -68,13 +68,14 @@ namespace Microsoft.Identity.Client.Platforms.iOS.SystemWebview
                     // iOS 13 requires a PresentationContextProvider
                     if (UIDevice.CurrentDevice.CheckSystemVersion(13, 0))
                     {
-                        asWebAuthenticationSession.PresentationContextProvider = new ASWebAuthenticationPresentationContextProviderWindow();
+                        asWebAuthenticationSession.BeginInvokeOnMainThread(() =>
+                        {
+                            asWebAuthenticationSession.PresentationContextProvider =
+                            new ASWebAuthenticationPresentationContextProviderWindow();
+                        });
                     }
 
-                    asWebAuthenticationSession.BeginInvokeOnMainThread(() =>
-                    {
-                        asWebAuthenticationSession.Start();
-                    });
+                    asWebAuthenticationSession.Start();
                 }
 
                 else if (UIDevice.CurrentDevice.CheckSystemVersion(11, 0))
