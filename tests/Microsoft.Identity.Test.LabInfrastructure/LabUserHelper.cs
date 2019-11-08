@@ -65,7 +65,8 @@ namespace Microsoft.Identity.Test.LabInfrastructure
         public static async Task<LabResponse> GetB2CMSAAccountAsync()
         {
             var response = await GetLabUserDataAsync(UserQuery.B2CMSAUserQuery).ConfigureAwait(false);
-            if (String.IsNullOrEmpty(response.User.HomeUPN))
+            if (string.IsNullOrEmpty(response.User.HomeUPN) || 
+                string.Equals("None", response.User.HomeUPN, StringComparison.OrdinalIgnoreCase))
             {
                 response.User.HomeUPN = response.User.Upn;
             }
@@ -75,7 +76,7 @@ namespace Microsoft.Identity.Test.LabInfrastructure
         public static Task<LabResponse> GetSpecificUserAsync(string upn)
         {
             var query = new UserQuery();
-            query.Upn = upn;
+            //query.Upn = upn;
             return GetLabUserDataAsync(query);
         }
 
@@ -83,15 +84,23 @@ namespace Microsoft.Identity.Test.LabInfrastructure
         {
             var query = UserQuery.DefaultUserQuery;
             query.FederationProvider = federationProvider;
-            query.IsFederatedUser = federated;
+            query.UserType = federated ? UserType.Federated : UserType.Cloud;
+
+            if (!federated &&
+                federationProvider != FederationProvider.ADFSv2019 )
+            {
+                throw new InvalidOperationException("Test Setup Error: MSAL only supports ADFS2019 direct (non-federated) access. " +
+                    "Support for older versions of ADFS is exclusively via federation");
+            }
+
             return GetLabUserDataAsync(query);
         }
 
-        public static string FetchUserPassword(string passwordUri)
+        public static string FetchUserPassword(string userLabName)
         {
-            if (string.IsNullOrWhiteSpace(passwordUri))
+            if (string.IsNullOrWhiteSpace(userLabName))
             {
-                throw new InvalidOperationException("Error: CredentialUrl is not set on user. Password retrieval failed.");
+                throw new InvalidOperationException("Error: lab name is not set on user. Password retrieval failed.");
             }
 
             if (s_keyVaultSecretsProvider == null)
@@ -101,8 +110,7 @@ namespace Microsoft.Identity.Test.LabInfrastructure
 
             try
             {
-                var secret = s_keyVaultSecretsProvider.GetSecret(passwordUri);
-                return secret.Value;
+                return s_labService.GetUserSecretAsync(userLabName).Result;
             }
             catch (Exception e)
             {

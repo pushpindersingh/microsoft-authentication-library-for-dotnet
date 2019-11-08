@@ -22,10 +22,11 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
     [TestClass]
     public partial class InteractiveFlowTests
     {
-        private readonly TimeSpan _interactiveAuthTimeout = TimeSpan.FromMinutes(1);
+        private readonly TimeSpan _interactiveAuthTimeout = TimeSpan.FromMinutes(5);
         private static readonly string[] s_scopes = new[] { "user.read" };
 
         #region MSTest Hooks
+
         /// <summary>
         /// Initialized by MSTest (do not make private or readonly)
         /// </summary>
@@ -43,7 +44,7 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
             TestCommon.ResetInternalStaticCaches();
         }
 
-        #endregion
+        #endregion MSTest Hooks
 
         [TestMethod]
         public async Task Interactive_AADAsync()
@@ -56,83 +57,23 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
 #if DESKTOP // no point in running these tests on NetCore - the code path is similar
 
         [TestMethod]
-        public async Task Interactive_AdfsV3_NotFederatedAsync()
-        {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.AdfsV4,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = false
-            };
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
-            await RunTestForUserAsync(labResponse).ConfigureAwait(false);
-        }
-
-        [TestMethod]
         public async Task Interactive_AdfsV3_FederatedAsync()
         {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.AdfsV4,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = true
-            };
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
+            LabResponse labResponse = await LabUserHelper.GetAdfsUserAsync(FederationProvider.AdfsV3, true).ConfigureAwait(false);
             await RunTestForUserAsync(labResponse).ConfigureAwait(false);
         }
 
         [TestMethod]
         public async Task Interactive_AdfsV2_FederatedAsync()
         {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.AdfsV2,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = true
-            };
-
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
-            await RunTestForUserAsync(labResponse).ConfigureAwait(false);
-        }
-
-        [TestMethod]
-        public async Task Interactive_AdfsV4_NotFederatedAsync()
-        {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.AdfsV4,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = false
-            };
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
+            LabResponse labResponse = await LabUserHelper.GetAdfsUserAsync(FederationProvider.AdfsV2, true).ConfigureAwait(false);
             await RunTestForUserAsync(labResponse).ConfigureAwait(false);
         }
 
         [TestMethod]
         public async Task Interactive_AdfsV4_FederatedAsync()
         {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.AdfsV4,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = true
-            };
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
+            LabResponse labResponse = await LabUserHelper.GetAdfsUserAsync(FederationProvider.AdfsV4, true).ConfigureAwait(false);
             await RunTestForUserAsync(labResponse).ConfigureAwait(false);
         }
 
@@ -146,34 +87,9 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
         }
 
         [TestMethod]
-        public async Task Interactive_AdfsV2019_NotFederatedAsync()
-        {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.ADFSv2019,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = false
-            };
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
-            await RunTestForUserAsync(labResponse).ConfigureAwait(false);
-        }
-
-        [TestMethod]
         public async Task Interactive_AdfsV2019_FederatedAsync()
         {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.ADFSv2019,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = true
-            };
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
+            LabResponse labResponse = await LabUserHelper.GetAdfsUserAsync(FederationProvider.ADFSv2019, true).ConfigureAwait(false);
             await RunTestForUserAsync(labResponse).ConfigureAwait(false);
         }
 
@@ -182,16 +98,7 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
         [TestMethod]
         public async Task Interactive_AdfsV2019_DirectAsync()
         {
-            // Arrange
-            UserQuery query = new UserQuery
-            {
-                FederationProvider = FederationProvider.ADFSv2019,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = true
-            };
-
-            LabResponse labResponse = await LabUserHelper.GetLabUserDataAsync(query).ConfigureAwait(false);
+            LabResponse labResponse = await LabUserHelper.GetAdfsUserAsync(FederationProvider.ADFSv2019, true).ConfigureAwait(false);
             await RunTestForUserAsync(labResponse, true).ConfigureAwait(false);
         }
 
@@ -206,23 +113,15 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
             AuthenticationResult defaultAccountResult = await RunTestForUserAsync(labResponseDefault).ConfigureAwait(false);
 
             //Acquire AT for ADFS 2019 account
-            UserQuery federatedUserquery = new UserQuery
-            {
-                FederationProvider = FederationProvider.ADFSv2019,
-                IsMamUser = false,
-                IsMfaUser = false,
-                IsFederatedUser = true
-            };
-
-            LabResponse labResponseFederated = await LabUserHelper.GetLabUserDataAsync(federatedUserquery).ConfigureAwait(false);
+            LabResponse labResponseFederated = await LabUserHelper.GetAdfsUserAsync(FederationProvider.ADFSv2019, true).ConfigureAwait(false);
             var federatedAccountResult = await RunTestForUserAsync(labResponseFederated, false).ConfigureAwait(false);
 
             //Acquire AT for MSA account
             LabResponse labResponseMsa = await LabUserHelper.GetB2CMSAAccountAsync().ConfigureAwait(false);
-            labResponseMsa.AppId = LabApiConstants.MSAOutlookAccountClientID;
+            labResponseMsa.App.AppId = LabApiConstants.MSAOutlookAccountClientID;
             var msaAccountResult = await RunTestForUserAsync(labResponseMsa).ConfigureAwait(false);
 
-            PublicClientApplication pca = PublicClientApplicationBuilder.Create(labResponseDefault.AppId).BuildConcrete();
+            PublicClientApplication pca = PublicClientApplicationBuilder.Create(labResponseDefault.App.AppId).BuildConcrete();
 
             AuthenticationResult authResult = await pca.AcquireTokenSilent(new[] { CoreUiTestConstants.DefaultScope }, defaultAccountResult.Account)
                                                        .ExecuteAsync()
@@ -231,7 +130,7 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
             Assert.IsNotNull(authResult.AccessToken);
             Assert.IsNotNull(authResult.IdToken);
 
-            pca = PublicClientApplicationBuilder.Create(labResponseFederated.AppId).BuildConcrete();
+            pca = PublicClientApplicationBuilder.Create(labResponseFederated.App.AppId).BuildConcrete();
 
             authResult = await pca.AcquireTokenSilent(new[] { CoreUiTestConstants.DefaultScope }, federatedAccountResult.Account)
                                   .ExecuteAsync()
@@ -259,12 +158,12 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
                     .Create(Adfs2019LabConstants.PublicClientId)
                     .WithRedirectUri(Adfs2019LabConstants.ClientRedirectUri)
                     .WithAdfsAuthority(Adfs2019LabConstants.Authority)
-                    .BuildConcrete();
+                    .Build();
             }
             else
             {
                 pca = PublicClientApplicationBuilder
-                    .Create(labResponse.AppId)
+                    .Create(labResponse.App.AppId)
                     .WithRedirectUri(SeleniumWebUI.FindFreeLocalhostRedirectUri())
                     .Build();
             }
@@ -281,25 +180,28 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
             userCacheAccess.AssertAccessCounts(0, 1);
             IAccount account = await MsalAssert.AssertSingleAccountAsync(labResponse, pca, result).ConfigureAwait(false);
             userCacheAccess.AssertAccessCounts(1, 1); // the assert calls GetAccounts
+            Assert.IsFalse(userCacheAccess.LastNotificationArgs.IsApplicationCache);
 
             Trace.WriteLine("Part 2 - Clear the cache");
             await pca.RemoveAsync(account).ConfigureAwait(false);
             userCacheAccess.AssertAccessCounts(1, 2);
             Assert.IsFalse((await pca.GetAccountsAsync().ConfigureAwait(false)).Any());
             userCacheAccess.AssertAccessCounts(2, 2);
+            Assert.IsFalse(userCacheAccess.LastNotificationArgs.IsApplicationCache);
 
             Trace.WriteLine("Part 3 - Acquire a token interactively again, with login hint");
             result = await pca
                 .AcquireTokenInteractive(s_scopes)
                 .WithCustomWebUi(CreateSeleniumCustomWebUI(labResponse.User, Prompt.ForceLogin, true, directToAdfs))
                 .WithPrompt(Prompt.ForceLogin)
-                .WithLoginHint(labResponse.User.HomeUPN)
+                .WithLoginHint(labResponse.User.Upn)
                 .ExecuteAsync(new CancellationTokenSource(_interactiveAuthTimeout).Token)
                 .ConfigureAwait(false);
             userCacheAccess.AssertAccessCounts(2, 3);
 
             account = await MsalAssert.AssertSingleAccountAsync(labResponse, pca, result).ConfigureAwait(false);
             userCacheAccess.AssertAccessCounts(3, 3);
+            Assert.IsFalse(userCacheAccess.LastNotificationArgs.IsApplicationCache);
 
             Trace.WriteLine("Part 4 - Acquire a token silently");
             result = await pca
@@ -308,6 +210,7 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
                 .ConfigureAwait(false);
 
             await MsalAssert.AssertSingleAccountAsync(labResponse, pca, result).ConfigureAwait(false);
+            Assert.IsFalse(userCacheAccess.LastNotificationArgs.IsApplicationCache);
 
             return result;
         }
@@ -315,7 +218,7 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
         private async Task RunPromptTestForUserAsync(LabResponse labResponse, Prompt prompt, bool useLoginHint)
         {
             var pca = PublicClientApplicationBuilder
-               .Create(labResponse.AppId)
+               .Create(labResponse.App.AppId)
                .WithRedirectUri(SeleniumWebUI.FindFreeLocalhostRedirectUri())
                .Build();
 
@@ -334,7 +237,6 @@ namespace Microsoft.Identity.Test.Integration.SeleniumTests
                .ConfigureAwait(false);
 
             await MsalAssert.AssertSingleAccountAsync(labResponse, pca, result).ConfigureAwait(false);
-
         }
 
         private SeleniumWebUI CreateSeleniumCustomWebUI(LabUser user, Prompt prompt, bool withLoginHint = false, bool adfsOnly = false)

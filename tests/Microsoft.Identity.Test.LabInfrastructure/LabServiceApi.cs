@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -13,13 +14,17 @@ namespace Microsoft.Identity.Test.LabInfrastructure
     /// <summary>
     /// Wrapper for new lab service API
     /// </summary>
-    public class LabServiceApi : ILabService, IDisposable
+    public class LabServiceApi : ILabService
     {
-        private readonly HttpClient _httpClient;
+        private string _labAccessAppId;
+        private string _labAccessClientSecret;
+        private string _labApiAccessToken;
 
         public LabServiceApi()
         {
-            _httpClient = new HttpClient();
+            KeyVaultSecretsProvider _keyVaultSecretsProvider = new KeyVaultSecretsProvider();
+            _labAccessAppId = _keyVaultSecretsProvider.GetMsidLabSecret("LabVaultAppID").Value;
+            _labAccessClientSecret = _keyVaultSecretsProvider.GetMsidLabSecret("LabVaultAppSecret").Value;
         }
 
         /// <summary>
@@ -31,16 +36,6 @@ namespace Microsoft.Identity.Test.LabInfrastructure
         {
             var response = await GetLabResponseFromApiAsync(query).ConfigureAwait(false);
             var user = response.User;
-
-            if (!Uri.IsWellFormedUriString(user.CredentialUrl, UriKind.Absolute))
-            {
-                Console.WriteLine($"User '{user.Upn}' has invalid Credential URL: '{user.CredentialUrl}'");
-            }
-
-            if (user.IsExternal && user.HomeUser == null)
-            {
-                Console.WriteLine($"User '{user.Upn}' has no matching home user.");
-            }
 
             return response;
         }
@@ -55,95 +50,82 @@ namespace Microsoft.Identity.Test.LabInfrastructure
                 throw new LabUserNotFoundException(query, "No lab user with specified parameters exists");
             }
 
-            return CreateLabResponseFromResultString(result);
+            return CreateLabResponseFromResultStringAsync(result).Result;
         }
 
-        private static LabResponse CreateLabResponseFromResultString(string result)
+        private async Task<LabResponse> CreateLabResponseFromResultStringAsync(string result)
         {
-            LabResponse response = JsonConvert.DeserializeObject<LabResponse>(result);
-            LabUser user = JsonConvert.DeserializeObject<LabUser>(result);
-
-            if (!string.IsNullOrEmpty(user.HomeTenantId) && !string.IsNullOrEmpty(user.HomeUPN))
+            LabUser[] userResponses = JsonConvert.DeserializeObject<LabUser[]>(result);
+            if (userResponses.Length > 1)
             {
-                user.InitializeHomeUser();
+                throw new InvalidOperationException(
+                    "Test Setup Error: Not expecting the lab to return multiple users for a query." +
+                    " Please have rewrite the query so that it returns a single user.");
             }
 
-            return response;
+            var user = userResponses[0];
+
+            var appResponse = await GetLabResponseAsync(LabApiConstants.LabAppEndpoint + user.AppId).ConfigureAwait(false);
+            LabApp[] labApps = JsonConvert.DeserializeObject<LabApp[]>(appResponse);
+
+            var labInfoResponse = await GetLabResponseAsync(LabApiConstants.LabInfoEndpoint + user.LabName).ConfigureAwait(false);
+            Lab[] labs = JsonConvert.DeserializeObject<Lab[]>(labInfoResponse);
+
+            user.TenantId = labs[0].TenantId;
+            user.FederationProvider = labs[0].FederationProvider;
+
+            return new LabResponse
+            {
+                User = user,
+                App = labApps[0]
+            };
         }
 
         private Task<string> RunQueryAsync(UserQuery query)
         {
             IDictionary<string, string> queryDict = new Dictionary<string, string>();
 
-            //Disabled for now until there are tests that use it.
-            queryDict.Add(LabApiConstants.MobileAppManagementWithConditionalAccess, LabApiConstants.False);
-            queryDict.Add(LabApiConstants.MobileDeviceManagementWithConditionalAccess, LabApiConstants.False);
-            bool queryRequiresBetaEndpoint = false;
-
             //Building user query
-            if (!string.IsNullOrWhiteSpace(query.Upn))
-            {
-                queryDict.Add(LabApiConstants.Upn, query.Upn);
-                return SendLabRequestAsync(LabApiConstants.LabEndpoint, queryDict);
-            }
-
-            if (query.FederationProvider != null)
-            {
-                if (query.FederationProvider == FederationProvider.ADFSv2019)
-                {
-                    queryRequiresBetaEndpoint = true;
-                }
-                queryDict.Add(LabApiConstants.FederationProvider, query.FederationProvider.ToString());
-            }
-
-            if (!string.IsNullOrWhiteSpace(query.Upn))
-            {
-                queryDict.Add(LabApiConstants.Upn, query.Upn);
-            }
-
-            queryDict.Add(LabApiConstants.MobileAppManagement, query.IsMamUser != null && (bool)(query.IsMamUser) ? LabApiConstants.True : LabApiConstants.False);
-            queryDict.Add(LabApiConstants.MultiFactorAuthentication, query.IsMfaUser != null && (bool)(query.IsMfaUser) ? LabApiConstants.True : LabApiConstants.False);
-
-            if (query.Licenses != null && query.Licenses.Count > 0)
-            {
-                queryDict.Add(LabApiConstants.License, query.Licenses.ToArray().ToString());
-            }
-
-            queryDict.Add(LabApiConstants.FederatedUser, query.IsFederatedUser != null && (bool)(query.IsFederatedUser) ? LabApiConstants.True : LabApiConstants.False);
+            //Required parameters will be set to default if not supplied by the test code
+            queryDict.Add(LabApiConstants.MultiFactorAuthentication, query.MFA != null ? query.MFA.ToString() : MFA.None.ToString());
+            queryDict.Add(LabApiConstants.ProtectionPolicy, query.ProtectionPolicy != null ? query.ProtectionPolicy.ToString() : ProtectionPolicy.None.ToString());
 
             if (query.UserType != null)
             {
                 queryDict.Add(LabApiConstants.UserType, query.UserType.ToString());
             }
 
-            queryDict.Add(LabApiConstants.External, query.IsExternalUser != null && (bool)(query.IsExternalUser) ? LabApiConstants.True : LabApiConstants.False);
-
-            if (query.B2CIdentityProvider == B2CIdentityProvider.Local)
+            if (query.HomeDomain != null)
             {
-                queryDict.Add(LabApiConstants.B2CProvider, LabApiConstants.B2CLocal);
+                queryDict.Add(LabApiConstants.HomeDomain, query.HomeDomain.ToString());
             }
 
-            if (query.B2CIdentityProvider == B2CIdentityProvider.Facebook)
+            if (query.HomeUPN != null)
             {
-                queryDict.Add(LabApiConstants.B2CProvider, LabApiConstants.B2CFacebook);
+                queryDict.Add(LabApiConstants.HomeUPN, query.HomeUPN.ToString());
             }
 
-            if (query.B2CIdentityProvider == B2CIdentityProvider.Google)
+            if (query.B2CIdentityProvider != null)
             {
-                queryDict.Add(LabApiConstants.B2CProvider, LabApiConstants.B2CGoogle);
+                queryDict.Add(LabApiConstants.B2CProvider, query.B2CIdentityProvider.ToString());
             }
 
-            if (query.B2CIdentityProvider == B2CIdentityProvider.MSA)
+            if (query.FederationProvider != null)
             {
-                queryDict.Add(LabApiConstants.B2CProvider, LabApiConstants.B2CMSA);
+                queryDict.Add(LabApiConstants.FederationProvider, query.FederationProvider.ToString());
             }
 
-            if (!string.IsNullOrEmpty(query.UserSearch))
+            if (query.AzureEnvironment != null)
             {
-                queryDict.Add(LabApiConstants.UserContains, query.UserSearch);
+                queryDict.Add(LabApiConstants.AzureEnvironment, query.AzureEnvironment.ToString());
             }
 
-            return SendLabRequestAsync(queryRequiresBetaEndpoint ? LabApiConstants.BetaEndpoint : LabApiConstants.LabEndpoint, queryDict);
+            if (query.SignInAudience != null)
+            {
+                queryDict.Add(LabApiConstants.SignInAudience, query.SignInAudience.ToString());
+            }
+
+            return SendLabRequestAsync(LabApiConstants.LabEndPoint, queryDict);
         }
 
         private async Task<string> SendLabRequestAsync(string requestUrl, IDictionary<string, string> queryDict)
@@ -152,12 +134,20 @@ namespace Microsoft.Identity.Test.LabInfrastructure
             {
                 Query = string.Join("&", queryDict.Select(x => x.Key + "=" + x.Value.ToString()))
             };
-            return await _httpClient.GetStringAsync(uriBuilder.ToString()).ConfigureAwait(false);
+
+            return await GetLabResponseAsync(uriBuilder.ToString()).ConfigureAwait(false);
         }
 
-        public void Dispose()
+        private async Task<string> GetLabResponseAsync(string address)
         {
-            _httpClient.Dispose();
+            if (String.IsNullOrWhiteSpace(_labApiAccessToken))
+                _labApiAccessToken = await LabAuthenticationHelper.GetAccessTokenForLabAPIAsync(_labAccessAppId, _labAccessClientSecret).ConfigureAwait(false);
+
+            using (HttpClient httpClient = new HttpClient())
+            {
+                httpClient.DefaultRequestHeaders.Add("Authorization", string.Format(CultureInfo.InvariantCulture, "bearer {0}", _labApiAccessToken));
+                return await httpClient.GetStringAsync(address).ConfigureAwait(false);
+            }
         }
 
         public async Task<LabResponse> CreateTempLabUserAsync()
@@ -169,7 +159,18 @@ namespace Microsoft.Identity.Test.LabInfrastructure
             };
 
             string result = await SendLabRequestAsync(LabApiConstants.CreateLabUser, queryDict).ConfigureAwait(false);
-            return CreateLabResponseFromResultString(result);
+            return CreateLabResponseFromResultStringAsync(result).Result;
+        }
+
+        public async Task<string> GetUserSecretAsync(string lab)
+        {
+            IDictionary<string, string> queryDict = new Dictionary<string, string>
+            {
+                { "secret", lab }
+            };
+
+            string result = await SendLabRequestAsync(LabApiConstants.LabUserCredentialEndpoint, queryDict).ConfigureAwait(false);
+            return JsonConvert.DeserializeObject<LabCredentialResponse>(result).Secret;
         }
     }
 }

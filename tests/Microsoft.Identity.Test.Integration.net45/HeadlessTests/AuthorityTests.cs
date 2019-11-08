@@ -8,10 +8,12 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using Microsoft.Identity.Client;
+using Microsoft.Identity.Client.Instance;
 using Microsoft.Identity.Client.Instance.Discovery;
 using Microsoft.Identity.Client.Utils;
 using Microsoft.Identity.Test.Common.Core.Helpers;
 using Microsoft.Identity.Test.LabInfrastructure;
+using Microsoft.Identity.Test.Unit;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Microsoft.Identity.Test.Integration.HeadlessTests
@@ -30,7 +32,7 @@ namespace Microsoft.Identity.Test.Integration.HeadlessTests
             LabUser user = labResponse.User;
 
             IPublicClientApplication pca = PublicClientApplicationBuilder
-                .Create(labResponse.AppId)
+                .Create(labResponse.App.AppId)
                 .WithLogging((lvl, msg, pii) => TestContext.WriteLine($"{lvl} - {msg}"), LogLevel.Verbose, true)
                 .Build();
 
@@ -43,7 +45,7 @@ namespace Microsoft.Identity.Test.Integration.HeadlessTests
                 // BugBug https://identitydivision.visualstudio.com/Engineering/_workitems/edit/776308/
                 // sts.windows.net fails when doing instance discovery, e.g.: 
                 // https://sts.windows.net/common/discovery/instance?api-version=1.1&authorization_endpoint=https%3A%2F%2Fsts.windows.net%2Ff645ad92-e38d-4d1a-b510-d1b09a74a8ca%2Foauth2%2Fv2.0%2Fauthorize
-                .WithAuthority("https://login.windows.net/" + user.CurrentTenantId + "/")
+                .WithAuthority("https://login.windows.net/" + user.TenantId + "/")
                 .ExecuteAsync()
                 .ConfigureAwait(false);
 
@@ -66,7 +68,7 @@ namespace Microsoft.Identity.Test.Integration.HeadlessTests
             LabUser user = labResponse.User;
 
             IPublicClientApplication pca = PublicClientApplicationBuilder
-                .Create(labResponse.AppId)
+                .Create(labResponse.App.AppId)
                 .WithAuthority("https://bogus.microsoft.com/common")
                 .WithLogging((lvl, msg, pii) => TestContext.WriteLine($"{lvl} - {msg}"), LogLevel.Verbose, true)
                 .Build();
@@ -83,6 +85,56 @@ namespace Microsoft.Identity.Test.Integration.HeadlessTests
 
             Assert.IsTrue(exception.Message.Contains("AADSTS50049"));
             Assert.AreEqual("invalid_instance", exception.ErrorCode);
+        }
+
+        [TestMethod]
+        public void FooTest()
+        {
+            var commonAuthority = AuthorityInfo.FromAuthorityUri(TestConstants.AuthorityCommonTenant, true);
+            var utidAuthority = AuthorityInfo.FromAuthorityUri(TestConstants.AuthorityUtidTenant, true);
+            var utid2Authority = AuthorityInfo.FromAuthorityUri(TestConstants.AuthorityUtid2Tenant, true);
+            var utid = TestConstants.Utid;
+            var utid2 = TestConstants.Utid2;
+
+            VerifyAuthority(
+                config: commonAuthority, 
+                request:null, 
+                accountTid: null, 
+                resultTid: "common");
+
+            VerifyAuthority(
+               config: commonAuthority,
+               request: commonAuthority,
+               accountTid: null,
+               resultTid: "common");
+
+            VerifyAuthority(
+              config: commonAuthority,
+              request: commonAuthority,
+              accountTid: utid,
+              resultTid: utid);
+
+            VerifyAuthority(
+             config: commonAuthority,
+             request: utidAuthority,
+             accountTid: null,
+             resultTid: utid);
+
+            VerifyAuthority(
+             config: commonAuthority,
+             request: utid2Authority,
+             accountTid: utid,
+             resultTid: utid2);
+        }
+
+        private static void VerifyAuthority(
+            AuthorityInfo config, 
+            AuthorityInfo request, 
+            string accountTid, 
+            string resultTid)
+        {
+            var resultAuthority = Authority.CreateAuthorityForRequest(config, request, accountTid);
+            Assert.AreEqual(resultTid, resultAuthority.GetTenantId());
         }
 
         /// <summary>
